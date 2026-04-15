@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Physics Engine - Earth Gravity Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Monaco', 'Menlo', monospace;
+            background: #111;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            outline: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        .ui-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(30, 30, 40, 0.95);
+            backdrop-filter: blur(8px);
+            border-radius: 16px;
+            padding: 12px 20px;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+            z-index: 100;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            pointer-events: auto;
+        }
+
+        button {
+            background: #2c3e66;
+            border: none;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            padding: 8px 20px;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+            letter-spacing: 0.5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        button:hover {
+            background: #1e2a4a;
+            transform: scale(1.02);
+        }
+
+        button.reset-btn {
+            background: #8b3c3c;
+        }
+
+        button.reset-btn:hover {
+            background: #6e2e2e;
+        }
+
+        .stats {
+            background: #000000aa;
+            padding: 5px 12px;
+            border-radius: 32px;
+            font-size: 0.85rem;
+            color: #0f0;
+            font-weight: bold;
+            font-family: monospace;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            backdrop-filter: blur(4px);
+        }
+
+        .stats span {
+            color: #ffaa66;
+        }
+
+        .gravity-control {
+            background: #000000aa;
+            padding: 5px 15px;
+            border-radius: 32px;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            color: #fff;
+            font-family: monospace;
+            font-size: 0.85rem;
+            backdrop-filter: blur(4px);
+        }
+
+        .gravity-control input {
+            width: 180px;
+            cursor: pointer;
+            background: #2c3e66;
+            height: 4px;
+            border-radius: 5px;
+            accent-color: #4c9aff;
+        }
+
+        .gravity-control span {
+            color: #ffaa66;
+            font-weight: bold;
+            min-width: 60px;
+        }
+
+        .gravity-status {
+            background: #000000aa;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            color: #4c9aff;
+            font-family: monospace;
+        }
+
+        .info {
+            position: fixed;
+            top: 12px;
+            right: 16px;
+            background: #000000aa;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            color: #ccc;
+            font-family: monospace;
+            pointer-events: none;
+            z-index: 100;
+            backdrop-filter: blur(4px);
+        }
+
+        .controls-info {
+            position: fixed;
+            bottom: 100px;
+            left: 20px;
+            background: #000000aa;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            color: #ccc;
+            font-family: monospace;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .preset-buttons {
+            display: inline-flex;
+            gap: 8px;
+        }
+
+        .preset-btn {
+            background: #3a3a5a;
+            padding: 5px 12px;
+            font-size: 0.75rem;
+        }
+
+        .preset-btn:hover {
+            background: #4a4a6a;
+        }
+
+        @media (max-width: 1000px) {
+            button { padding: 6px 12px; font-size: 0.8rem; }
+            .stats { font-size: 0.7rem; }
+            .gravity-control { font-size: 0.7rem; padding: 5px 10px; }
+            .gravity-control input { width: 100px; }
+            .controls-info { font-size: 0.6rem; bottom: 80px; }
+            .preset-btn { padding: 3px 8px; font-size: 0.65rem; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="glcanvas"></canvas>
+    <div class="ui-panel">
+        <button id="addCubeBtn">➕ Add Cube</button>
+        <button id="addSphereBtn">⚪ Add Sphere</button>
+        <button id="resetBtn" class="reset-btn">🔄 Reset Scene</button>
+        <div class="gravity-control">
+            🌍 Gravity: <input type="range" id="gravitySlider" min="0" max="30" step="0.1" value="9.8">
+            <span id="gravityValue">9.8</span>
+            <span class="gravity-status" id="gravityStatus">🌍 Earth Normal</span>
+        </div>
+        <div class="preset-buttons">
+            <button id="earthBtn" class="preset-btn">🌍 Earth (9.8)</button>
+            <button id="moonBtn" class="preset-btn">🌙 Moon (1.6)</button>
+            <button id="marsBtn" class="preset-btn">🔴 Mars (3.7)</button>
+            <button id="jupiterBtn" class="preset-btn">🪐 Jupiter (24.8)</button>
+            <button id="zeroBtn" class="preset-btn">✨ Zero-G (0)</button>
+        </div>
+        <div class="stats">
+            📦 Bodies: <span id="bodyCount">0</span>&nbsp;&nbsp;| 🎞️ FPS: <span id="fpsCounter">--</span>
+        </div>
+    </div>
+    <div class="info">
+        🧪 Earth Gravity Simulation (9.8 m/s²) | Realistic Physics | Objects fall from height
+    </div>
+    <div class="controls-info">
+        🖱️ Drag to rotate camera | Scroll to zoom | Objects fall from elevated positions
+    </div>
+
+    <script>
+        // ==============================================================
+        // MATH MODULES
+        // ==============================================================
+        class Vec3 {
+            constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
+            set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
+            copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this; }
+            clone() { return new Vec3(this.x, this.y, this.z); }
+            add(v) { this.x += v.x; this.y += v.y; this.z += v.z; return this; }
+            sub(v) { this.x -= v.x; this.y -= v.y; this.z -= v.z; return this; }
+            mulScalar(s) { this.x *= s; this.y *= s; this.z *= s; return this; }
+            lengthSq() { return this.x*this.x + this.y*this.y + this.z*this.z; }
+            length() { return Math.sqrt(this.lengthSq()); }
+            normalize() { const len = this.length(); if (len > 1e-8) this.mulScalar(1/len); return this; }
+            dot(v) { return this.x*v.x + this.y*v.y + this.z*v.z; }
+            cross(v) { return new Vec3(this.y*v.z - this.z*v.y, this.z*v.x - this.x*v.z, this.x*v.y - this.y*v.x); }
+            static add(a, b) { return new Vec3(a.x+b.x, a.y+b.y, a.z+b.z); }
+            static sub(a, b) { return new Vec3(a.x-b.x, a.y-b.y, a.z-b.z); }
+            static mulScalar(v, s) { return new Vec3(v.x*s, v.y*s, v.z*s); }
+        }
+
+        class Matrix4 {
+            constructor() { this.m = new Float32Array(16); this.identity(); }
+            identity() { 
+                const m=this.m; 
+                m[0]=1;m[1]=0;m[2]=0;m[3]=0; 
+                m[4]=0;m[5]=1;m[6]=0;m[7]=0; 
+                m[8]=0;m[9]=0;m[10]=1;m[11]=0; 
+                m[12]=0;m[13]=0;m[14]=0;m[15]=1; 
+                return this; 
+            }
+            perspective(fov, aspect, near, far) {
+                const f = 1.0 / Math.tan(fov * 0.5);
+                const m = this.m;
+                m[0] = f / aspect; m[1] = 0; m[2] = 0; m[3] = 0;
+                m[4] = 0; m[5] = f; m[6] = 0; m[7] = 0;
+                m[8] = 0; m[9] = 0; m[10] = (far+near)/(near-far); m[11] = -1;
+                m[12] = 0; m[13] = 0; m[14] = (2*far*near)/(near-far); m[15] = 0;
+                return this;
+            }
+            lookAt(eye, target, up) {
+                const z = Vec3.sub(eye, target).normalize();
+                const x = up.cross(z).normalize();
+                const y = z.cross(x);
+                const m = this.m;
+                m[0]=x.x; m[1]=y.x; m[2]=z.x; m[3]=0;
+                m[4]=x.y; m[5]=y.y; m[6]=z.y; m[7]=0;
+                m[8]=x.z; m[9]=y.z; m[10]=z.z; m[11]=0;
+                m[12]= -x.dot(eye); m[13]= -y.dot(eye); m[14]= -z.dot(eye); m[15]=1;
+                return this;
+            }
+            translation(x, y, z) { 
+                const m = this.m; 
+                m[12] = x; 
+                m[13] = y; 
+                m[14] = z; 
+                return this; 
+            }
+        }
+
+        // ==============================================================
+        // AABB (Axis-Aligned Bounding Box)
+        // ==============================================================
+        class AABB {
+            constructor(center, halfSize) {
+                this.center = center.clone();
+                this.halfSize = halfSize.clone();
+            }
+            min() { return Vec3.sub(this.center, this.halfSize); }
+            max() { return Vec3.add(this.center, this.halfSize); }
+            intersects(other) {
+                const aMin = this.min(), aMax = this.max();
+                const bMin = other.min(), bMax = other.max();
+                return (aMin.x <= bMax.x && aMax.x >= bMin.x &&
+                        aMin.y <= bMax.y && aMax.y >= bMin.y &&
+                        aMin.z <= bMax.z && aMax.z >= bMin.z);
+            }
+            getPenetration(other) {
+                const aMin = this.min(), aMax = this.max();
+                const bMin = other.min(), bMax = other.max();
+                const dx = Math.min(aMax.x - bMin.x, bMax.x - aMin.x);
+                const dy = Math.min(aMax.y - bMin.y, bMax.y - aMin.y);
+                const dz = Math.min(aMax.z - bMin.z, bMax.z - aMin.z);
+                if (dx < 0 || dy < 0 || dz < 0) return null;
+                let normal = new Vec3(0,0,0);
+                let depth = dx;
+                if (dy < depth) { depth = dy; normal.set(0,1,0); }
+                if (dz < depth) { depth = dz; normal.set(0,0,1); }
+                const centerDelta = Vec3.sub(other.center, this.center);
+                if (normal.dot(centerDelta) < 0) normal.mulScalar(-1);
+                return { normal, depth };
+            }
+        }
+
+        // ==============================================================
+        // RIGID BODY
+        // ==============================================================
+        class RigidBody {
+            constructor(mass, position, size, type = 'cube') {
+                this.mass = mass;
+                this.invMass = mass > 0 ? 1.0/mass : 0;
+                this.position = position.clone();
+                this.velocity = new Vec3(0,0,0);
+                this.size = size.clone();
+                this.type = type;
+                this.restitution = 0.7;  // Bounciness
+                this.friction = 0.4;      // Friction coefficient
+                this.aabb = new AABB(position, size);
+                this.color = type === 'cube' ? [0.4, 0.7, 0.9, 1] : [0.9, 0.5, 0.3, 1];
+            }
+            updateAABB() {
+                this.aabb.center.copy(this.position);
+                this.aabb.halfSize.copy(this.size);
+            }
+            integrate(dt, gravityStrength) {
+                if (this.invMass === 0) return;
+                // Earth gravity: 9.8 m/s² downward
+                this.velocity.y -= gravityStrength * dt;
+                this.position.x += this.velocity.x * dt;
+                this.position.y += this.velocity.y * dt;
+                this.position.z += this.velocity.z * dt;
+                this.updateAABB();
+            }
+        }
+
+        // ==============================================================
+        // COLLISION RESOLVER
+        // ==============================================================
+        function resolveCollision(a, b, collision) {
+            const normal = collision.normal;
+            const depth = collision.depth;
+            
+            // Position correction
+            const correction = Vec3.mulScalar(normal, depth * 0.5);
+            if (a.invMass > 0) a.position.sub(correction);
+            if (b.invMass > 0) b.position.add(correction);
+            a.updateAABB(); b.updateAABB();
+            
+            const relVel = Vec3.sub(b.velocity, a.velocity);
+            const velAlong = relVel.dot(normal);
+            if (velAlong > 0) return;
+            
+            const e = Math.min(a.restitution, b.restitution);
+            let j = -(1 + e) * velAlong;
+            j /= (a.invMass + b.invMass);
+            const impulse = Vec3.mulScalar(normal, j);
+            
+            if (a.invMass > 0) a.velocity.sub(Vec3.mulScalar(impulse, a.invMass));
+            if (b.invMass > 0) b.velocity.add(Vec3.mulScalar(impulse, b.invMass));
+            
+            // Friction
+            const tangent = Vec3.sub(relVel, Vec3.mulScalar(normal, relVel.dot(normal)));
+            if (tangent.lengthSq() > 1e-6) tangent.normalize();
+            const mu = (a.friction + b.friction) * 0.5;
+            const jt = -relVel.dot(tangent) * mu;
+            const frictionImpulse = Vec3.mulScalar(tangent, jt);
+            if (a.invMass > 0) a.velocity.sub(Vec3.mulScalar(frictionImpulse, a.invMass));
+            if (b.invMass > 0) b.velocity.add(Vec3.mulScalar(frictionImpulse, b.invMass));
+        }
+
+        // ==============================================================
+        // PHYSICS WORLD
+        // ==============================================================
+        class PhysicsWorld {
+            constructor(gravityStrength = 9.8) {
+                this.bodies = [];
+                this.gravityStrength = gravityStrength;
+                this.groundY = -3.2;
+            }
+            addBody(body) { this.bodies.push(body); }
+            removeAll() { this.bodies = []; }
+            setGravity(value) { 
+                this.gravityStrength = value; 
+            }
+            step(dt) {
+                // Semi-implicit Euler integration
+                for (let b of this.bodies) b.integrate(dt, this.gravityStrength);
+                
+                // Collision resolution with iterations
+                for (let iter = 0; iter < 5; iter++) {
+                    for (let i = 0; i < this.bodies.length; i++) {
+                        const a = this.bodies[i];
+                        for (let j = i+1; j < this.bodies.length; j++) {
+                            const b = this.bodies[j];
+                            if (a.invMass === 0 && b.invMass === 0) continue;
+                            if (!a.aabb.intersects(b.aabb)) continue;
+                            const collision = a.aabb.getPenetration(b.aabb);
+                            if (collision) resolveCollision(a, b, collision);
+                        }
+                    }
+                }
+                
+                // Ground collision
+                for (let b of this.bodies) {
+                    const halfHeight = b.size.y;
+                    
+                    // Ground collision
+                    if (b.position.y - halfHeight < this.groundY) {
+                        b.position.y = this.groundY + halfHeight;
+                        if (b.velocity.y < 0) b.velocity.y *= -b.restitution;
+                        b.velocity.x *= (1 - b.friction * 0.5);
+                        b.velocity.z *= (1 - b.friction * 0.5);
+                        b.updateAABB();
+                    }
+                    
+                    // Ceiling (soft boundary)
+                    if (b.position.y + halfHeight > 6.0) {
+                        b.position.y = 6.0 - halfHeight;
+                        if (b.velocity.y > 0) b.velocity.y *= -0.3;
+                        b.updateAABB();
+                    }
+                    
+                    // Horizontal boundaries
+                    const bound = 6.0;
+                    if (Math.abs(b.position.x) > bound - b.size.x) {
+                        b.position.x = Math.sign(b.position.x) * (bound - b.size.x);
+                        b.velocity.x *= -b.restitution * 0.8;
+                    }
+                    if (Math.abs(b.position.z) > bound - b.size.z) {
+                        b.position.z = Math.sign(b.position.z) * (bound - b.size.z);
+                        b.velocity.z *= -b.restitution * 0.8;
+                    }
+                }
+            }
+        }
+
+        // ==============================================================
+        // RENDERING ENGINE (Raw WebGL)
+        // ==============================================================
+        
+        const vsSource = `
+            attribute vec3 aPos;
+            attribute vec3 aNormal;
+            uniform mat4 uModel;
+            uniform mat4 uView;
+            uniform mat4 uProjection;
+            varying vec3 vNormal;
+            varying vec3 vWorldPos;
+            void main() {
+                vec4 worldPos = uModel * vec4(aPos, 1.0);
+                vWorldPos = worldPos.xyz;
+                vNormal = mat3(uModel) * aNormal;
+                gl_Position = uProjection * uView * worldPos;
+            }
+        `;
+
+        const fsSource = `
+            precision mediump float;
+            varying vec3 vNormal;
+            varying vec3 vWorldPos;
+            uniform vec3 uLightDir;
+            uniform vec3 uLightColor;
+            uniform vec3 uAmbient;
+            uniform vec4 uColor;
+            void main() {
+                vec3 normal = normalize(vNormal);
+                vec3 lightDir = normalize(uLightDir);
+                float diff = max(dot(normal, lightDir), 0.2);
+                vec3 diffuse = diff * uLightColor;
+                vec3 ambient = uAmbient;
+                vec3 result = (ambient + diffuse) * uColor.rgb;
+                gl_FragColor = vec4(result, uColor.a);
+            }
+        `;
+
+        function createShaderProgram(gl, vsSrc, fsSrc) {
+            const vs = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vs, vsSrc);
+            gl.compileShader(vs);
+            if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
+                console.error('VS Error:', gl.getShaderInfoLog(vs));
+            }
+            
+            const fs = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fs, fsSrc);
+            gl.compileShader(fs);
+            if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+                console.error('FS Error:', gl.getShaderInfoLog(fs));
+            }
+            
+            const prog = gl.createProgram();
+            gl.attachShader(prog, vs);
+            gl.attachShader(prog, fs);
+            gl.linkProgram(prog);
+            if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+                console.error('Link Error:', gl.getProgramInfoLog(prog));
+            }
+            return prog;
+        }
+
+        function createCubeMesh(gl) {
+            const vertices = [
+                -0.5, -0.5,  0.5,  0,  0,  1,
+                 0.5, -0.5,  0.5,  0,  0,  1,
+                 0.5,  0.5,  0.5,  0,  0,  1,
+                -0.5,  0.5,  0.5,  0,  0,  1,
+                -0.5, -0.5, -0.5,  0,  0, -1,
+                -0.5,  0.5, -0.5,  0,  0, -1,
+                 0.5,  0.5, -0.5,  0,  0, -1,
+                 0.5, -0.5, -0.5,  0,  0, -1,
+                -0.5,  0.5, -0.5,  0,  1,  0,
+                -0.5,  0.5,  0.5,  0,  1,  0,
+                 0.5,  0.5,  0.5,  0,  1,  0,
+                 0.5,  0.5, -0.5,  0,  1,  0,
+                -0.5, -0.5, -0.5,  0, -1,  0,
+                 0.5, -0.5, -0.5,  0, -1,  0,
+                 0.5, -0.5,  0.5,  0, -1,  0,
+                -0.5, -0.5,  0.5,  0, -1,  0,
+                 0.5, -0.5, -0.5,  1,  0,  0,
+                 0.5,  0.5, -0.5,  1,  0,  0,
+                 0.5,  0.5,  0.5,  1,  0,  0,
+                 0.5, -0.5,  0.5,  1,  0,  0,
+                -0.5, -0.5, -0.5, -1,  0,  0,
+                -0.5, -0.5,  0.5, -1,  0,  0,
+                -0.5,  0.5,  0.5, -1,  0,  0,
+                -0.5,  0.5, -0.5, -1,  0,  0
+            ];
+            
+            const indices = [];
+            for (let i = 0; i < 6; i++) {
+                const base = i * 4;
+                indices.push(base, base+1, base+2, base, base+2, base+3);
+            }
+            
+            const vbo = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+            
+            const ibo = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+            
+            return { vbo, ibo, indexCount: indices.length, stride: 6 * 4, posOffset: 0, normOffset: 3 * 4 };
+        }
+
+        function createSphereMesh(gl, radius = 0.5, segments = 24) {
+            const vertices = [];
+            const indices = [];
+            
+            for (let i = 0; i <= segments; i++) {
+                const phi = Math.PI * i / segments;
+                const y = radius * Math.cos(phi);
+                const r = radius * Math.sin(phi);
+                
+                for (let j = 0; j <= segments; j++) {
+                    const theta = 2 * Math.PI * j / segments;
+                    const x = r * Math.cos(theta);
+                    const z = r * Math.sin(theta);
+                    const nx = x / radius;
+                    const ny = y / radius;
+                    const nz = z / radius;
+                    vertices.push(x, y, z, nx, ny, nz);
+                }
+            }
+            
+            for (let i = 0; i < segments; i++) {
+                for (let j = 0; j < segments; j++) {
+                    const first = i * (segments + 1) + j;
+                    const second = first + segments + 1;
+                    indices.push(first, second, first + 1);
+                    indices.push(second, second + 1, first + 1);
+                }
+            }
+            
+            const vbo = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+            
+            const ibo = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+            
+            return { vbo, ibo, indexCount: indices.length, stride: 6 * 4, posOffset: 0, normOffset: 3 * 4 };
+        }
+
+        // ==============================================================
+        // MAIN APPLICATION
+        // ==============================================================
+        const canvas = document.getElementById('glcanvas');
+        const gl = canvas.getContext('webgl');
+        
+        if (!gl) {
+            alert('WebGL not supported!');
+            throw new Error('WebGL not supported');
+        }
+        
+        const program = createShaderProgram(gl, vsSource, fsSource);
+        gl.useProgram(program);
+        
+        const uModel = gl.getUniformLocation(program, 'uModel');
+        const uView = gl.getUniformLocation(program, 'uView');
+        const uProjection = gl.getUniformLocation(program, 'uProjection');
+        const uLightDir = gl.getUniformLocation(program, 'uLightDir');
+        const uLightColor = gl.getUniformLocation(program, 'uLightColor');
+        const uAmbient = gl.getUniformLocation(program, 'uAmbient');
+        const uColor = gl.getUniformLocation(program, 'uColor');
+        
+        const cubeMesh = createCubeMesh(gl);
+        const sphereMesh = createSphereMesh(gl);
+        
+        gl.enable(gl.DEPTH_TEST);
+        gl.enable(gl.CULL_FACE);
+        gl.clearColor(0.1, 0.12, 0.2, 1);
+        
+        const world = new PhysicsWorld(9.8);
+        
+        function resetScene() {
+            world.removeAll();
+            // Green ground platform
+            const ground = new RigidBody(0, new Vec3(0, -3.2, 0), new Vec3(6.5, 0.2, 6.5), 'cube');
+            ground.color = [0.3, 0.7, 0.3, 1];
+            world.addBody(ground);
+            
+            // Add objects at ELEVATED positions (much higher above ground)
+            // Ground is at y = -3.2, objects start between y = -1.5 to y = 1.5 (3-5 units above ground)
+            const positions = [
+                [-1.5, 0.5, -1], [1.2, 0.8, 1.5], [-0.5, 1.2, 1.8], [1.8, 0.3, -1.2],
+                [-1.2, 1.5, 1.2], [0.5, 2.0, -1.5], [-1.8, 0.7, -0.8], [1.0, 1.0, -1.8],
+                [0, 1.8, 0.5], [-0.8, 1.2, 1.8], [1.5, 0.5, 0.8], [-1.0, 1.5, -0.5],
+                [0.8, 2.2, -0.5], [-0.5, 0.8, -1.8], [1.2, 1.5, 0.2], [-1.5, 1.0, 0.5]
+            ];
+            for (let i = 0; i < positions.length; i++) {
+                const type = i % 2 === 0 ? 'cube' : 'sphere';
+                const pos = new Vec3(positions[i][0], positions[i][1], positions[i][2]);
+                const size = new Vec3(0.5, 0.5, 0.5);
+                const rb = new RigidBody(1.0, pos, size, type);
+                // Add slight random horizontal velocity for more interesting falls
+                rb.velocity = new Vec3((Math.random() - 0.5) * 1.5, 0, (Math.random() - 0.5) * 1.5);
+                world.addBody(rb);
+            }
+        }
+        
+        function addCube() {
+            // New cubes fall from higher up (y between 1 and 2.5)
+            const pos = new Vec3((Math.random() - 0.5) * 5, 1.5 + Math.random() * 2, (Math.random() - 0.5) * 5);
+            const rb = new RigidBody(1.0, pos, new Vec3(0.5, 0.5, 0.5), 'cube');
+            rb.velocity = new Vec3((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 2);
+            world.addBody(rb);
+        }
+        
+        function addSphere() {
+            // New spheres fall from higher up
+            const pos = new Vec3((Math.random() - 0.5) * 5, 1.5 + Math.random() * 2, (Math.random() - 0.5) * 5);
+            const rb = new RigidBody(1.0, pos, new Vec3(0.5, 0.5, 0.5), 'sphere');
+            rb.velocity = new Vec3((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 2);
+            world.addBody(rb);
+        }
+        
+        // UI Event Listeners
+        document.getElementById('addCubeBtn').onclick = addCube;
+        document.getElementById('addSphereBtn').onclick = addSphere;
+        document.getElementById('resetBtn').onclick = resetScene;
+        
+        // Preset buttons
+        document.getElementById('earthBtn').onclick = () => {
+            gravitySlider.value = '9.8';
+            gravityValue.innerText = '9.8';
+            world.setGravity(9.8);
+            gravityStatus.innerHTML = '🌍 Earth Normal';
+            gravityStatus.style.color = '#66ffaa';
+        };
+        document.getElementById('moonBtn').onclick = () => {
+            gravitySlider.value = '1.6';
+            gravityValue.innerText = '1.6';
+            world.setGravity(1.6);
+            gravityStatus.innerHTML = '🌙 Moon Gravity';
+            gravityStatus.style.color = '#aaaaff';
+        };
+        document.getElementById('marsBtn').onclick = () => {
+            gravitySlider.value = '3.7';
+            gravityValue.innerText = '3.7';
+            world.setGravity(3.7);
+            gravityStatus.innerHTML = '🔴 Mars Gravity';
+            gravityStatus.style.color = '#ffaa66';
+        };
+        document.getElementById('jupiterBtn').onclick = () => {
+            gravitySlider.value = '24.8';
+            gravityValue.innerText = '24.8';
+            world.setGravity(24.8);
+            gravityStatus.innerHTML = '🪐 Jupiter Gravity';
+            gravityStatus.style.color = '#ff6666';
+        };
+        document.getElementById('zeroBtn').onclick = () => {
+            gravitySlider.value = '0';
+            gravityValue.innerText = '0';
+            world.setGravity(0);
+            gravityStatus.innerHTML = '✨ Zero Gravity ✨';
+            gravityStatus.style.color = '#66ffaa';
+        };
+        
+        // Gravity control
+        const gravitySlider = document.getElementById('gravitySlider');
+        const gravityValue = document.getElementById('gravityValue');
+        const gravityStatus = document.getElementById('gravityStatus');
+        
+        gravitySlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            gravityValue.innerText = val.toFixed(1);
+            world.setGravity(val);
+            
+            // Update status based on gravity value
+            if (val === 0) {
+                gravityStatus.innerHTML = '✨ Zero Gravity ✨';
+                gravityStatus.style.color = '#66ffaa';
+            } else if (val < 3) {
+                gravityStatus.innerHTML = '🌙 Low Gravity';
+                gravityStatus.style.color = '#aaaaff';
+            } else if (val < 7) {
+                gravityStatus.innerHTML = '🔴 Medium Gravity';
+                gravityStatus.style.color = '#ffaa66';
+            } else if (val < 15) {
+                gravityStatus.innerHTML = '🌍 Earth-like Gravity';
+                gravityStatus.style.color = '#66ffaa';
+            } else {
+                gravityStatus.innerHTML = '🪐 High Gravity';
+                gravityStatus.style.color = '#ff6666';
+            }
+        });
+        
+        resetScene();
+        
+        // Camera controls
+        let cameraAngleX = 0.5;
+        let cameraAngleY = 0.8;
+        let cameraDistance = 14;
+        let mouseX = 0, mouseY = 0;
+        let isDragging = false;
+        
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            canvas.style.cursor = 'grabbing';
+        });
+        
+        window.addEventListener('mouseup', () => { 
+            isDragging = false; 
+            canvas.style.cursor = 'grab';
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const dx = e.clientX - mouseX;
+                const dy = e.clientY - mouseY;
+                cameraAngleY += dx * 0.01;
+                cameraAngleX += dy * 0.01;
+                cameraAngleX = Math.max(-1.5, Math.min(1.5, cameraAngleX));
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            }
+        });
+        
+        canvas.addEventListener('wheel', (e) => {
+            cameraDistance -= e.deltaY * 0.01;
+            cameraDistance = Math.max(6, Math.min(22, cameraDistance));
+            e.preventDefault();
+        });
+        
+        canvas.style.cursor = 'grab';
+        
+        // Handle window resize
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fps = 60;
+        
+        function render() {
+            const now = performance.now();
+            let dt = Math.min(0.033, (now - lastTime) / 1000);
+            if (dt > 0.01) world.step(dt);
+            lastTime = now;
+            
+            frameCount++;
+            if (frameCount % 30 === 0) {
+                fps = Math.round(1 / dt);
+                document.getElementById('fpsCounter').innerText = fps;
+                document.getElementById('bodyCount').innerText = world.bodies.length;
+            }
+            
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            
+            const aspect = canvas.width / canvas.height;
+            const projection = new Matrix4().perspective(Math.PI / 4, aspect, 0.1, 100);
+            
+            // Camera position - adjusted for better view of falling objects
+            const cameraX = Math.sin(cameraAngleY) * Math.cos(cameraAngleX) * cameraDistance;
+            const cameraY = Math.sin(cameraAngleX) * cameraDistance + 1.5;
+            const cameraZ = Math.cos(cameraAngleY) * Math.cos(cameraAngleX) * cameraDistance;
+            const cameraPos = new Vec3(cameraX, cameraY, cameraZ);
+            const cameraTarget = new Vec3(0, 0.5, 0);
+            const cameraUp = new Vec3(0, 1, 0);
+            
+            const view = new Matrix4().lookAt(cameraPos, cameraTarget, cameraUp);
+            
+            gl.uniformMatrix4fv(uProjection, false, projection.m);
+            gl.uniformMatrix4fv(uView, false, view.m);
+            gl.uniform3f(uLightDir, -0.5, -1.0, -0.8);
+            gl.uniform3f(uLightColor, 1.0, 0.95, 0.85);
+            gl.uniform3f(uAmbient, 0.3, 0.3, 0.35);
+            
+            const posLoc = gl.getAttribLocation(program, 'aPos');
+            const normLoc = gl.getAttribLocation(program, 'aNormal');
+            gl.enableVertexAttribArray(posLoc);
+            gl.enableVertexAttribArray(normLoc);
+            
+            for (const body of world.bodies) {
+                const model = new Matrix4().identity();
+                model.translation(body.position.x, body.position.y, body.position.z);
+                model.m[0] *= body.size.x;
+                model.m[5] *= body.size.y;
+                model.m[10] *= body.size.z;
+                
+                gl.uniformMatrix4fv(uModel, false, model.m);
+                gl.uniform4fv(uColor, body.color);
+                
+                const mesh = body.type === 'cube' ? cubeMesh : sphereMesh;
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vbo);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.ibo);
+                gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, mesh.stride, mesh.posOffset);
+                gl.vertexAttribPointer(normLoc, 3, gl.FLOAT, false, mesh.stride, mesh.normOffset);
+                gl.drawElements(gl.TRIANGLES, mesh.indexCount, gl.UNSIGNED_SHORT, 0);
+            }
+            
+            requestAnimationFrame(render);
+        }
+        
+        render();
+    </script>
+</body>
+</html>
